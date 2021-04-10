@@ -1,3 +1,4 @@
+// Package gocron povides simple functionlity for scheduling cron jobs.
 package gocron
 
 import (
@@ -6,10 +7,14 @@ import (
     "reflect"
 )
 
+// A Job is an interface for a scheduled job.
+//
+// Run performs the job while t is the job's execution time.
 type Job interface {
     Run(t time.Time)
 }
 
+// A Cron represents a scheduled job.
 type Cron struct {
     job Job
 
@@ -19,6 +24,7 @@ type Cron struct {
     start []time.Time
 }
 
+// NewCron returns a scheduled context enabled job with specified interval and an optional start time.
 func NewCron(job Job, ctx context.Context, interval time.Duration, start ...time.Time) *Cron {
     c := &Cron{job: job, ctx: ctx, interval: interval}
     if len(start) > 0 {
@@ -27,17 +33,21 @@ func NewCron(job Job, ctx context.Context, interval time.Duration, start ...time
     return c
 }
 
+// Start performs a blocking call for starting the cron job.
 func (c *Cron) Start() {
     for t := range cron(c.ctx, c.interval, c.start...) {
         c.job.Run(t)
     }
 }
 
+// ClockToTime returns Time instance from a specified clock.
+// It is an auxiliary function when start time should not be dependent on date.
 func ClockToTime(hour, minute, second, nanosecond int) time.Time {
     empty := time.Time{}
     location := time.Now().Location()
     return time.Date(empty.Year(), empty.Month(), empty.Day(), hour, minute, second, nanosecond, location)
 }
+
 
 func cron(ctx context.Context, interval time.Duration, start ...time.Time) <-chan time.Time {
 
