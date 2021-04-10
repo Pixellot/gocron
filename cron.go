@@ -56,8 +56,9 @@ func cronFromDate(ctx context.Context, interval time.Duration, start time.Time) 
         if delay < 0 {
             delay = 0
         }
-        t := <-time.After(delay)
-        stream <- t
+        if proceed := wait(ctx, delay, stream); !proceed {
+            return
+        }
 
         tick(ctx, interval, stream)
     }()
@@ -71,8 +72,9 @@ func cronFromClock(ctx context.Context, interval time.Duration, start Clock) <-c
 
     go func() {
 
-        t := <-time.After(sync(time.Now(), start))
-        stream <- t
+        if proceed := wait(ctx, sync(time.Now(), start), stream); !proceed {
+            return
+        }
 
         tick(ctx, interval, stream)
     }()
@@ -93,6 +95,18 @@ func tick(ctx context.Context, interval time.Duration, stream chan time.Time) {
             close(stream)
             return
         }
+    }
+}
+
+func wait(ctx context.Context, delay time.Duration, stream chan time.Time) bool {
+
+    select {
+    case t := <-time.After(delay):
+        stream <- t
+        return true
+    case <-ctx.Done():
+        close(stream)
+        return false
     }
 }
 
