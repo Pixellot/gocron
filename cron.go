@@ -46,7 +46,7 @@ func cron(ctx context.Context, interval time.Duration, start ...time.Time) <-cha
     go func() {
 
         if len(start) > 0 {
-            if proceed := wait(ctx, sync(time.Now(), start[0]), stream); !proceed {
+            if proceed := wait(ctx, synch(time.Now(), start[0]), stream); !proceed {
                 return
             }
         }
@@ -85,7 +85,7 @@ func wait(ctx context.Context, delay time.Duration, stream chan time.Time) bool 
     }
 }
 
-func sync(ref, wanted time.Time) time.Duration {
+func synch(ref, wanted time.Time) time.Duration {
     if ref.IsZero() {
         return 0
     }
