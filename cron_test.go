@@ -18,7 +18,8 @@ func TestCronJob(t *testing.T) {
     job := &Counter{0}
     interval := time.Millisecond * 10
 
-    ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond * 100)
+    ctx, cancel := context.WithTimeout(context.Background(),
+        time.Millisecond * 100)
     defer cancel()
 
     c := NewCron(ctx, interval, job)
@@ -27,7 +28,7 @@ func TestCronJob(t *testing.T) {
     got := job.times
     want := 10
 
-    if got != want {
+    if got < want - 1 || got > want + 1 {
         t.Errorf("want %d, but got %d", want, got)
     }
 }
