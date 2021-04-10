@@ -24,22 +24,10 @@ func NewCron(ctx context.Context, interval time.Duration, job Job) *Cron {
     return &Cron{ctx: ctx, interval: interval, job: job}
 }
 
-func (c *Cron) StartAsync() {
-    go func() {
-        c.Start()
-    }()
-}
-
 func (c *Cron) Start() {
     for t := range cron(c.ctx, c.interval) {
-        c.runJobAsync(t)
-    }
-}
-
-func (c *Cron) runJobAsync(t time.Time) {
-    go func() {
         c.job.Run(t)
-    }()
+    }
 }
 
 func sync(t time.Time, c Clock) time.Duration {
@@ -56,25 +44,28 @@ func sync(t time.Time, c Clock) time.Duration {
     return req.Sub(t)
 }
 
+func tick(ctx context.Context, interval time.Duration, stream chan time.Time) {
+
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case t := <-ticker.C:
+            stream <- t
+        case <-ctx.Done():
+            close(stream)
+            return
+        }
+    }
+}
+
 func cron(ctx context.Context, interval time.Duration) <-chan time.Time {
 
     stream := make(chan time.Time, 1)
 
     go func() {
-
-        ticker := time.NewTicker(interval)
-        defer ticker.Stop()
-
-        for {
-            select {
-            case t := <-ticker.C:
-                stream <- t
-            case <-ctx.Done():
-                close(stream)
-                return
-            }
-        }
-
+        tick(ctx, interval, stream)
     }()
 
     return stream
