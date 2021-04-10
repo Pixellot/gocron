@@ -25,23 +25,59 @@ func NewCron(ctx context.Context, interval time.Duration, job Job) *Cron {
 }
 
 func (c *Cron) Start() {
-    for t := range cron(c.ctx, c.interval) {
+    for t := range cronFromNow(c.ctx, c.interval) {
         c.job.Run(t)
     }
 }
 
-func sync(t time.Time, c Clock) time.Duration {
+func cronFromNow(ctx context.Context, interval time.Duration) <-chan time.Time {
 
-    req := time.Date(
-        t.Year(), t.Month(), t.Day(),
-        c.Hour, c.Minutes, c.Seconds, c.Nanoseconds,
-        t.Location())
+    stream := make(chan time.Time, 1)
 
-    if diff := req.Sub(t); diff < 0 {
-        req = req.AddDate(0, 0, 1)
+    go func() {
+        tick(ctx, interval, stream)
+    }()
+
+    return stream
+}
+
+func cronFromDate(ctx context.Context, interval time.Duration, start time.Time) <-chan time.Time {
+
+    now := time.Now()
+    if start.Sub(now) < 0 {
+        start = now
     }
 
-    return req.Sub(t)
+    stream := make(chan time.Time, 1)
+
+    go func() {
+
+        delay := start.Sub(time.Now())
+        if delay < 0 {
+            delay = 0
+        }
+        t := <-time.After(delay)
+        stream <- t
+
+        tick(ctx, interval, stream)
+    }()
+
+    return stream
+}
+
+func cronFromClock(ctx context.Context, interval time.Duration, start Clock) <-chan time.Time {
+
+    stream := make(chan time.Time, 1)
+
+    go func() {
+
+        t := <-time.After(sync(time.Now(), start))
+        stream <- t
+
+        tick(ctx, interval, stream)
+    }()
+
+    return stream
 }
 
 func tick(ctx context.Context, interval time.Duration, stream chan time.Time) {
@@ -60,14 +96,16 @@ func tick(ctx context.Context, interval time.Duration, stream chan time.Time) {
     }
 }
 
-func cron(ctx context.Context, interval time.Duration) <-chan time.Time {
+func sync(t time.Time, c Clock) time.Duration {
 
-    stream := make(chan time.Time, 1)
+    req := time.Date(
+        t.Year(), t.Month(), t.Day(),
+        c.Hour, c.Minutes, c.Seconds, c.Nanoseconds,
+        t.Location())
 
-    go func() {
-        tick(ctx, interval, stream)
-    }()
+    if diff := req.Sub(t); diff < 0 {
+        req = req.AddDate(0, 0, 1)
+    }
 
-    return stream
+    return req.Sub(t)
 }
-
