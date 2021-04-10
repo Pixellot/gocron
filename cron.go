@@ -6,10 +6,6 @@ import (
     "reflect"
 )
 
-type Clock struct {
-    Hour, Minutes, Seconds, Nanoseconds int
-}
-
 type Job interface {
     Run(t time.Time)
 }
