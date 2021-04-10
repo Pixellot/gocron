@@ -3,6 +3,7 @@ package gocron
 import (
     "time"
     "context"
+    "reflect"
 )
 
 type Clock struct {
@@ -14,66 +15,44 @@ type Job interface {
 }
 
 type Cron struct {
+    job Job
+
     ctx context.Context
     interval time.Duration
 
-    job Job
+    start []time.Time
 }
 
-func NewCron(ctx context.Context, interval time.Duration, job Job) *Cron {
-    return &Cron{ctx: ctx, interval: interval, job: job}
+func NewCron(job Job, ctx context.Context, interval time.Duration, start ...time.Time) *Cron {
+    c := &Cron{job: job, ctx: ctx, interval: interval}
+    if len(start) > 0 {
+        c.start = append(c.start, start[0])
+    }
+    return c
 }
 
 func (c *Cron) Start() {
-    for t := range cronFromNow(c.ctx, c.interval) {
+    for t := range cron(c.ctx, c.interval, c.start...) {
         c.job.Run(t)
     }
 }
 
-func cronFromNow(ctx context.Context, interval time.Duration) <-chan time.Time {
-
-    stream := make(chan time.Time, 1)
-
-    go func() {
-        tick(ctx, interval, stream)
-    }()
-
-    return stream
+func ClockToTime(hour, minute, second, nanosecond int) time.Time {
+    empty := time.Time{}
+    location := time.Now().Location()
+    return time.Date(empty.Year(), empty.Month(), empty.Day(), hour, minute, second, nanosecond, location)
 }
 
-func cronFromDate(ctx context.Context, interval time.Duration, start time.Time) <-chan time.Time {
-
-    now := time.Now()
-    if start.Sub(now) < 0 {
-        start = now
-    }
+func cron(ctx context.Context, interval time.Duration, start ...time.Time) <-chan time.Time {
 
     stream := make(chan time.Time, 1)
 
     go func() {
 
-        delay := start.Sub(time.Now())
-        if delay < 0 {
-            delay = 0
-        }
-        if proceed := wait(ctx, delay, stream); !proceed {
-            return
-        }
-
-        tick(ctx, interval, stream)
-    }()
-
-    return stream
-}
-
-func cronFromClock(ctx context.Context, interval time.Duration, start Clock) <-chan time.Time {
-
-    stream := make(chan time.Time, 1)
-
-    go func() {
-
-        if proceed := wait(ctx, sync(time.Now(), start), stream); !proceed {
-            return
+        if len(start) > 0 {
+            if proceed := wait(ctx, sync(time.Now(), start[0]), stream); !proceed {
+                return
+            }
         }
 
         tick(ctx, interval, stream)
@@ -110,16 +89,41 @@ func wait(ctx context.Context, delay time.Duration, stream chan time.Time) bool 
     }
 }
 
-func sync(t time.Time, c Clock) time.Duration {
-
-    req := time.Date(
-        t.Year(), t.Month(), t.Day(),
-        c.Hour, c.Minutes, c.Seconds, c.Nanoseconds,
-        t.Location())
-
-    if diff := req.Sub(t); diff < 0 {
-        req = req.AddDate(0, 0, 1)
+func sync(ref, wanted time.Time) time.Duration {
+    if ref.IsZero() {
+        return 0
     }
 
-    return req.Sub(t)
+    ref = ref.In(wanted.Location())
+
+    wantedDate := auxDate{}
+    wantedDate.y, wantedDate.m, wantedDate.d = wanted.Date()
+    emptyDate := auxDate{}
+    emptyDate.y, emptyDate.m, emptyDate.d = time.Time{}.Date()
+
+    if reflect.DeepEqual(wantedDate, emptyDate) {
+        wanted = time.Date(
+            ref.Year(), ref.Month(), ref.Day(),
+            wanted.Hour(), wanted.Minute(), wanted.Second(), wanted.Nanosecond(),
+            wanted.Location())
+
+        if diff := wanted.Sub(ref); diff < 0 {
+            wanted = wanted.AddDate(0, 0, 1)
+        }
+
+        return wanted.Sub(ref)
+    }
+
+    delay := wanted.Sub(ref)
+    if delay < 0 {
+        delay = 0
+    }
+
+    return delay
 }
+
+type auxDate struct {
+    y, d int
+    m time.Month
+}
+
