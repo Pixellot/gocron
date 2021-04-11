@@ -56,7 +56,7 @@ func TestMultipleCronOnSameJob(t *testing.T) {
     got := job.times
     want := 20
 
-    if got < want - 1 || got > want + 1 {
+    if got < want - 2 || got > want + 2 {
         t.Errorf("want %d, but got %d", want, got)
     }
 }
