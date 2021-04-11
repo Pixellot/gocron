@@ -1,2 +1,2 @@
 # gocron
-Cron jobs and scheduling package
+A simple cron jobs scheduling package
