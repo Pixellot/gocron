@@ -55,10 +55,12 @@ func cron(ctx context.Context, interval time.Duration, start ...time.Time) <-cha
 
     go func() {
 
+        delay := time.Second * 0
         if len(start) > 0 {
-            if proceed := wait(ctx, synch(time.Now(), start[0]), stream); !proceed {
-                return
-            }
+            delay = synch(time.Now(), start[0])
+        }
+        if proceed := wait(ctx, delay, stream); !proceed {
+            return
         }
 
         tick(ctx, interval, stream)
