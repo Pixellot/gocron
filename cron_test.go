@@ -9,7 +9,11 @@ import (
 
 type Counter struct {
     times int
-    mtx sync.Mutex
+    mtx *sync.Mutex
+}
+
+func newCounter() *Counter {
+    return &Counter{times: 0, mtx: &sync.Mutex{}}
 }
 
 func (c* Counter) Run(t time.Time) {
@@ -19,7 +23,7 @@ func (c* Counter) Run(t time.Time) {
 }
 
 func TestCronJobWithoutStartTime(t *testing.T) {
-    job := &Counter{times: 0}
+    job := newCounter()
     interval := time.Millisecond * 10
 
     ctx, cancel := context.WithTimeout(context.Background(),
@@ -38,15 +42,15 @@ func TestCronJobWithoutStartTime(t *testing.T) {
 }
 
 func TestMultipleCronOnSameJob(t *testing.T) {
-    job := &Counter{times: 0}
+    job := newCounter()
     interval := time.Millisecond * 10
 
     ctx, cancel := context.WithTimeout(context.Background(),
         time.Millisecond * 100)
     defer cancel()
 
-    c1 := NewCron(job, ctx, interval)
     go func() {
+        c1 := NewCron(job, ctx, interval)
         c1.Start()
     }()
 
@@ -62,7 +66,7 @@ func TestMultipleCronOnSameJob(t *testing.T) {
 }
 
 func TestCronJobStartTime(t *testing.T) {
-    job := &Counter{times: 0}
+    job := newCounter()
     interval := time.Millisecond * 10
 
     ctx, cancel := context.WithTimeout(context.Background(),
@@ -83,7 +87,7 @@ func TestCronJobStartTime(t *testing.T) {
 }
 
 func TestCronJobStartClock(t *testing.T) {
-    job := &Counter{times: 0}
+    job := newCounter()
     interval := time.Millisecond * 10
 
     ctx, cancel := context.WithTimeout(context.Background(),
