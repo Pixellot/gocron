@@ -1,3 +1,3 @@
-module github.com/oren12321/gocron
+module github.com/Pixellot/gocron
 
 go 1.16
